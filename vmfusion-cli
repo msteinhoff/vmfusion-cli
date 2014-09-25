@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 import argparse
+import yaml
+import os.path
+import vmfusion
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
@@ -61,5 +64,162 @@ def parse_arguments():
 
     return args
 
+class Machine(object):
+    def __init__(self, name, vmx_path):
+        self.name = name
+        self.vmx_path = vmx_path
+
+        if not os.path.exists(vmx_path):
+            raise ValueError('vmx path {0} does not exist'.format(vmx_path))
+
+    def start(self, vmrun):
+        print "Starting machine {}".format(self.name)
+        vmrun.start(self.vmx_path, gui=False)
+
+    def stop(self, vmrun):
+        print "Stopping machine {}".format(self.name)
+        vmrun.stop(self.vmx_path, soft=True)
+
+    def __str__(self):
+        return self.name
+
+class Group(object):
+    def __init__(self, name, machines):
+        self.name = name
+        self.machines = machines
+
+    def start(self, vmrun):
+        print "Starting group {}".format(self.name)
+        for machine in self.machines:
+            machine.start(vmrun)
+
+    def stop(self, vmrun):
+        print "Stopping group {}".format(self.name)
+        for machine in reversed(self.machines):
+            machine.stop(vmrun)
+
+    def __str__(self):
+        return self.name
+
+class Library(object):
+    def __init__(self, path=None):
+        self.path = path or os.path.expanduser('~/.vmfusion-library.yml')
+
+        self.load_library()
+        self.check_duplicate_names()
+        self.init_items()
+
+    def load_library(self):
+        with open(self.path, 'r') as f:
+            self.data = yaml.safe_load( f )
+
+    def get_data(self):
+        return (self.data['machines'], self.data['groups'])
+
+    def check_duplicate_names(self):
+        machines, groups = self.get_data()
+
+        def found_duplicate(name):
+            raise ValueError('Machine and group names must be unique, found duplicate: {0}'.format(name))
+
+        for machine in machines:
+            if machine in groups:
+                found_duplicate(machine)
+        
+        for group in groups:
+            if group in machines:
+                found_duplicate(machine)
+
+    def init_items(self):
+        self.items = {}
+        self.machines = {}
+        self.groups = {}
+        machines, groups = self.get_data()
+
+        for machine_name, vmx_path in machines.iteritems():
+            obj = Machine(machine_name, vmx_path)
+
+            self.items[machine_name] = obj
+            self.machines[machine_name] = obj
+
+        for group_name, group_machines in groups.iteritems():
+            machines = [self.items[machine_name] for machine_name in group_machines]
+
+            obj = Group(group_name, machines)
+            self.items[group_name] = obj
+            self.groups[group_name] = obj
+
+    def item(self, name):
+        return self.items[name]
+
+class Client(object):
+    def __init__(self, path, library):
+        self.library = library
+        self.path = path or os.path.expanduser('~/.vmfusion.yml')
+
+        self.load_config()
+
+    def load_config(self):
+        vmrun_path = '/Applications/VMware Fusion.app'
+
+        if os.path.exists(self.path):
+            with open(self.path, 'r') as f:
+                config = yaml.safe_load( f )
+
+            try:
+                vmrun_path = config['vmrun']
+            except KeyError:
+                pass
+
+        self.vmrun = vmfusion.vmrun_cli( vmrun_path )
+
+    def get_running_vmx_paths(self):
+        list = self.vmrun.list()
+
+        return list['machines']
+
+    def status(self):
+        running = self.get_running_vmx_paths()
+
+        for group_name, group in sorted(self.library.groups.items()):
+            print 'Group \'{}\':'.format(group_name)
+            for machine in sorted(group.machines):
+                if machine.vmx_path in running:
+                    status = 'running'
+                else:
+                    status = 'stopped'
+
+                print '- {}: {}'.format(machine.name, status)
+            print ''
+
+    def start(self, name):
+        try:
+            item = library.item(name)
+            item.start(self.vmrun)
+        except KeyError:
+            print 'Could not find object {}'.format(name)
+
+    def stop(self, name):
+        try:
+            item = library.item(name)
+            item.stop(self.vmrun)
+        except KeyError:
+            print 'Could not find object {}'.format(name)
+
 if __name__ == '__main__':
-    args = parse_arguments()    
+    args = parse_arguments()
+    library = Library(args.library)
+    client = Client(args.config, library)
+
+    if args.command == 'status':
+        client.status()
+
+    elif args.command == 'start':
+        client.start(args.name)
+
+    elif args.command == 'stop':
+        client.stop(args.name)
+
+    elif args.command == 'restart':
+        client.stop(args.name)
+        client.start(args.name)
