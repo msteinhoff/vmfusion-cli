@@ -1,4 +1,65 @@
 #!/usr/bin/env python
+import argparse
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+        prog='vmfusion-cli',
+        description='VMware Fusion command line interface'
+    )
+
+    parser.add_argument(
+        '-c',
+        dest='config',
+        metavar='config',
+        help='The path of the config file to use.'
+    )
+    parser.add_argument(
+        '-l',
+        dest='library',
+        metavar='library',
+        help='The path of the library to use.'
+    )
+
+    sub_parsers = parser.add_subparsers( title='subcommands', metavar='', dest='command' )
+    sub_parsers.add_parser(
+        'status',
+        help='Lists all VMs in the library and their current status.'
+    )
+
+    sub_parsers.add_parser(
+        'start',
+         help='Starts the VM instance or group in the background'
+    ).add_argument(
+        'name',
+        nargs='?',
+        help='A valid VM or group name.'
+    )
+
+    sub_parsers.add_parser(
+        'stop',
+         help='Stops the VM instance or group'
+    ).add_argument(
+        'name',
+        nargs='?',
+        help='A valid VM or group name.'
+    )
+
+    sub_parsers.add_parser(
+        'restart',
+         help='Restarts the VM instance or group'
+    ).add_argument(
+        'name',
+        nargs='?',
+        help='A valid VM or group name.'
+    )
+
+    args = parser.parse_args()
+
+    if not args.command:
+        parser.print_help()
+        sys.exit( 1 )
+
+    return args
 
 if __name__ == '__main__':
-    pass
+    args = parse_arguments()    
