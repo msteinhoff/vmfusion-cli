@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import argparse
-import yaml
 import os.path
+import yaml
 import vmfusion
 
 def parse_arguments():
