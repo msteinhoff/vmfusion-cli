@@ -30,12 +30,12 @@ If no library path is given, library path defaults to `~/.vmfusion-library.yml`.
 Sample configuration:
 
     ---
-    - machines:
+    machines:
         dev-vm1: /Users/Shared/Virtual Machines/dev-vm1/redhat.vmx
         dev-vm1: /Users/Shared/Virtual Machines/dev-vm1/redhat.vmx
         test-vm1: /Users/Shared/Virtual Machines/test-vm1/redhat.vmx
         test-vm2: /Users/Shared/Virtual Machines/test-vm2/redhat.vmx
-    - groups:
+    groups:
         devenv:
         - dev-vm1
         - dev-vm2
